@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import CalendarView from './CalendarView';
 import FilterPanel from './FilterPanel';
 import MindMapView from './MindmapView';
@@ -36,15 +36,6 @@ export default function TrelloBoardView({ assignment, onBack }) {
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [shareTab, setShareTab] = useState('members'); // 'members' | 'requests'
-  const [groupMembers, setGroupMembers] = useState([
-    { id: 'm1', name: 'Natchaya Yada', initial: 'N', bg: 'bg-[#FFD765]', text: 'text-black' },
-    { id: 'm2', name: 'Chayaporn Somsiri', initial: 'C', bg: 'bg-[#52C41A]', text: 'text-white' },
-  ]);
-  const [joinRequests, setJoinRequests] = useState([
-    { id: 'r1', name: 'Sudarat Junda', initial: 'S', bg: 'bg-[#FFD765]', text: 'text-black' },
-    { id: 'r2', name: 'Viriya Chotasorn', initial: 'V', bg: 'bg-[#FFD765]', text: 'text-black' },
-  ]);
   const [isViewDropdownOpen, setIsViewDropdownOpen] = useState(false);
   const [currentView, setCurrentView] = useState('แผนผังงาน'); // ค่าเริ่มต้น
   const [files, setFiles] = useState(['ไฟล์งานที่ 1']);
@@ -110,13 +101,26 @@ export default function TrelloBoardView({ assignment, onBack }) {
     endDrag();
   };
 
-  const handleAcceptRequest = (req) => {
-    setGroupMembers((prev) => [...prev, req]);
-    setJoinRequests((prev) => prev.filter((r) => r.id !== req.id));
+  // ===== เพิ่มลิสต์ (คอลัมน์) ใหม่แบบ Trello =====
+  const [isAddingList, setIsAddingList] = useState(false);
+  const [newListTitle, setNewListTitle] = useState('');
+  const boardScrollRef = useRef(null);
+
+  const closeAddList = () => {
+    setIsAddingList(false);
+    setNewListTitle('');
   };
 
-  const handleRejectRequest = (id) => {
-    setJoinRequests((prev) => prev.filter((r) => r.id !== id));
+  const handleAddList = () => {
+    const title = newListTitle.trim();
+    if (!title) return;
+    setColumns((prev) => [...prev, { id: `col-${Date.now()}`, title, cards: [] }]);
+    setNewListTitle('');
+    // เลื่อนบอร์ดไปทางขวาให้เห็นลิสต์ใหม่และช่องกรอกถัดไป
+    requestAnimationFrame(() => {
+      const el = boardScrollRef.current;
+      if (el) el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' });
+    });
   };
 
   const handleAddFile = () => {
@@ -235,10 +239,7 @@ export default function TrelloBoardView({ assignment, onBack }) {
 
           {/* ปุ่มแชร์ */}
           <button
-            onClick={() => {
-              setShareTab('members');
-              setIsShareModalOpen(true);
-            }}
+            onClick={() => setIsShareModalOpen(true)}
             className="h-[44px] w-[119px] bg-[#35A9E8] hover:bg-[#269bdc] rounded-[12px] flex items-center justify-center gap-[10px] text-white text-[14px] font-semibold cursor-pointer transition shadow-sm"
           >
             <Share2 className="w-[22px] h-[22px] stroke-[1.8]" />
@@ -261,7 +262,7 @@ export default function TrelloBoardView({ assignment, onBack }) {
           <div className="w-[213px] bg-[#BDB4D8] rounded-[32px] px-[14px] py-[20px] flex flex-col justify-between shrink-0 overflow-y-auto">
             <div>
               <div className="px-[12px] flex flex-col items-center text-center">
-                <h3 className="text-black text-[12px] font-bold mb-[12px] leading-[1.3]">
+                <h3 className="text-black text-[13px] font-bold mb-[12px] leading-[1.3]">
                   ข้อมูลรายละเอียดภายในกลุ่ม
                 </h3>
                 <button
@@ -304,7 +305,7 @@ export default function TrelloBoardView({ assignment, onBack }) {
           </div>
 
           {/* BOARD AREA */}
-          <div className="flex-1 min-w-0 rounded-[22px] bg-gradient-to-b from-[#9687C2] via-[#8FB0D5] to-[#8BE8F5] overflow-x-scroll overflow-y-hidden">
+          <div ref={boardScrollRef} className="flex-1 min-w-0 rounded-[22px] bg-gradient-to-b from-[#9687C2] via-[#8FB0D5] to-[#8BE8F5] overflow-x-scroll overflow-y-hidden">
             <div className="w-max min-w-full h-full p-[16px]">
               <div className="flex gap-[14px] items-start h-full">
                 {columns.map((col) => (
@@ -401,12 +402,44 @@ export default function TrelloBoardView({ assignment, onBack }) {
                   </div>
                 ))}
 
-                <button
-                  onClick={() => alert('เพิ่มลิสต์รายการอื่น ๆ')}
-                  className="w-[190px] h-[47px] bg-white/40 hover:bg-white/50 rounded-[22px] shrink-0 text-white text-[13px] font-semibold flex items-center justify-center cursor-pointer transition"
-                >
-                  + เพิ่มลิสต์รายการอื่น ๆ
-                </button>
+                {isAddingList ? (
+                  <div className="w-[178px] bg-white rounded-[8px] px-[11px] py-[12px] shrink-0 flex flex-col gap-[8px]">
+                    <input
+                      autoFocus
+                      value={newListTitle}
+                      onChange={(e) => setNewListTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleAddList();
+                        if (e.key === 'Escape') closeAddList();
+                      }}
+                      placeholder="กรอกชื่อลิสต์..."
+                      className="w-full h-[34px] px-[10px] rounded-[8px] border-2 border-[#35A9E8] bg-white text-[12px] text-black outline-none select-text"
+                    />
+                    <div className="flex items-center gap-[6px]">
+                      <button
+                        onClick={handleAddList}
+                        disabled={!newListTitle.trim()}
+                        className="h-[30px] px-[12px] rounded-[8px] bg-[#35A9E8] hover:bg-[#269bdc] disabled:opacity-50 disabled:cursor-not-allowed text-white text-[12px] font-semibold cursor-pointer transition"
+                      >
+                        เพิ่มลิสต์
+                      </button>
+                      <button
+                        onClick={closeAddList}
+                        className="w-[30px] h-[30px] rounded-[8px] flex items-center justify-center text-gray-500 hover:bg-gray-100 cursor-pointer transition"
+                        title="ยกเลิก"
+                      >
+                        <X className="w-[16px] h-[16px]" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setIsAddingList(true)}
+                    className="w-[190px] h-[47px] bg-white/40 hover:bg-white/50 rounded-[22px] shrink-0 text-white text-[13px] font-semibold flex items-center justify-center cursor-pointer transition"
+                  >
+                    + เพิ่มลิสต์รายการอื่น ๆ
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -543,79 +576,32 @@ export default function TrelloBoardView({ assignment, onBack }) {
             </div>
 
             <div className="mb-6">
-              {/* แท็บสลับ สมาชิกกลุ่ม / คำขอเข้ากลุ่ม */}
-              <div className="flex gap-[24px] border-b border-gray-200 mb-3">
-                {[
-                  { key: 'members', label: 'สมาชิกกลุ่ม' },
-                  { key: 'requests', label: 'คำขอเข้ากลุ่ม', count: joinRequests.length },
-                ].map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setShareTab(tab.key)}
-                    className={`pb-2 -mb-px text-[13px] font-semibold flex items-center gap-[6px] cursor-pointer transition border-b-2 ${
-                      shareTab === tab.key
-                        ? 'text-black border-[#35A9E8]'
-                        : 'text-gray-400 border-transparent hover:text-gray-600'
-                    }`}
-                  >
-                    {tab.label}
-                    {tab.count > 0 && (
-                      <span className="min-w-[18px] h-[18px] px-[5px] rounded-full bg-[#FF6B6B] text-white text-[10px] flex items-center justify-center">
-                        {tab.count}
-                      </span>
-                    )}
-                  </button>
-                ))}
+              <div className="grid grid-cols-2 text-gray-500 text-[12px] font-semibold mb-2">
+                <span>สมาชิกกลุ่ม</span>
+                <span>คำขอเข้ากลุ่ม</span>
               </div>
-
-              {shareTab === 'members' ? (
-                <div className="space-y-3">
-                  {groupMembers.map((m) => (
-                    <div key={m.id} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-[30px] h-[30px] rounded-full ${m.bg} flex items-center justify-center text-[11px] font-semibold ${m.text}`}>
-                          {m.initial}
-                        </div>
-                        <span className="text-[13px] text-gray-800">{m.name}</span>
-                      </div>
-                      <select className="bg-gray-100 text-gray-700 text-[12px] px-2 py-1 rounded-[8px] outline-none cursor-pointer">
-                        <option>สมาชิก</option>
-                        <option>แอดมิน</option>
-                      </select>
-                    </div>
-                  ))}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-[30px] h-[30px] rounded-full bg-[#FFD765] flex items-center justify-center text-[11px] font-semibold text-black">N</div>
+                    <span className="text-[13px] text-gray-800">Natchaya Yada</span>
+                  </div>
+                  <select className="bg-gray-100 text-gray-700 text-[12px] px-2 py-1 rounded-[8px] outline-none cursor-pointer">
+                    <option>สมาชิก</option>
+                    <option>แอดมิน</option>
+                  </select>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {joinRequests.length === 0 && (
-                    <p className="text-gray-400 text-[12px] text-center py-4">ไม่มีคำขอเข้ากลุ่ม</p>
-                  )}
-                  {joinRequests.map((r) => (
-                    <div key={r.id} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-[30px] h-[30px] rounded-full ${r.bg} flex items-center justify-center text-[11px] font-semibold ${r.text}`}>
-                          {r.initial}
-                        </div>
-                        <span className="text-[13px] text-gray-800">{r.name}</span>
-                      </div>
-                      <div className="flex items-center gap-[6px]">
-                        <button
-                          onClick={() => handleAcceptRequest(r)}
-                          className="px-[10px] py-[3px] rounded-[4px] border border-gray-200 bg-[#FBF5F5] hover:bg-[#E8F4FD] text-[11px] text-black cursor-pointer transition"
-                        >
-                          ตอบรับ
-                        </button>
-                        <button
-                          onClick={() => handleRejectRequest(r.id)}
-                          className="px-[10px] py-[3px] rounded-[4px] border border-gray-200 bg-[#FBF5F5] hover:bg-[#FFE3E3] text-[11px] text-black cursor-pointer transition"
-                        >
-                          ปฏิเสธ
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-[30px] h-[30px] rounded-full bg-[#52C41A] flex items-center justify-center text-[11px] font-semibold text-white">C</div>
+                    <span className="text-[13px] text-gray-800">Chayaporn Somsiri</span>
+                  </div>
+                  <select className="bg-gray-100 text-gray-700 text-[12px] px-2 py-1 rounded-[8px] outline-none cursor-pointer">
+                    <option>สมาชิก</option>
+                    <option>แอดมิน</option>
+                  </select>
                 </div>
-              )}
+              </div>
             </div>
 
             <div className="flex justify-end">
