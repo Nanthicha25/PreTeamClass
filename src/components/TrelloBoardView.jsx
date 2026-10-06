@@ -274,7 +274,7 @@ export default function TrelloBoardView({ assignment, onBack }) {
               </div>
 
               <div className="mt-[31px]">
-                <h3 className="px-[12px] text-black text-[13px] font-bold mb-[7px]">
+                <h3 className="px-[12px] text-black text-[13px] font-bold mb-[7px] text-center">
                   งานที่เสร็จสิ้น
                 </h3>
                 <div className="w-full h-[70px] bg-white rounded-[12px] px-[4px] pt-[8px]">
